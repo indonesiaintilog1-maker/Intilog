@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maintenance V14 (CRUD & Colorful)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root {
+            --bg-body: #e0e0e0;
+            --card-bg: #ffffff;
+            --theme-nav: #333;
+            --accent: #00e676; 
+            --edit-color: #ffa000;
+            --delete-color: #d32f2f;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-body);
+            margin: 0; padding: 0;
+            color: #333;
+            min-height: 100vh;
+            display: flex; flex-direction: column;
+        }
+
+        /* --- NAVIGASI --- */
+        .navbar {
+            background-color: var(--theme-nav); color: white; padding: 10px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 100;
+        }
+        .navbar h2 { margin: 0; font-size: 1.1rem; font-weight: 600; letter-spacing: 1px; }
+        .nav-links button {
+            background: #555; border: none; color: white; padding: 6px 15px;
+            cursor: pointer; border-radius: 4px; margin-left: 5px; font-size: 0.85rem; transition: 0.3s;
+        }
+        .nav-links button:hover, .nav-links button.active { background: var(--accent); color: #000; font-weight: bold; }
+
+        /* --- CONTAINER --- */
+        .container { flex: 1; padding: 15px; width: 100%; box-sizing: border-box; }
+        .page-section { display: none; height: 100%; }
+        .page-section.active { display: block; }
+
+        /* --- DASHBOARD GRID --- */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 0.8fr; 
+            grid-template-rows: 1fr 1fr;
+            gap: 15px;
+            height: calc(100vh - 80px);
+        }
+
+        .chart-card {
+            background: var(--card-bg); padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); position: relative;
+        }
+
+        .area-chart { grid-column: 1; grid-row: 1; }       
+        .cat-chart  { grid-column: 2; grid-row: 1; }       
+        .eng-chart  { grid-column: 3; grid-row: 1 / span 2; } 
+        .month-chart{ grid-column: 1 / span 2; grid-row: 2; } 
+
+        .canvas-container { position: relative; width: 100%; height: 100%; }
+
+        /* --- FORM STYLES --- */
+        .form-box {
+            background: white; max-width: 1100px; margin: 0 auto; padding: 25px;
+            border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        
+        .form-group { margin-bottom: 10px; }
+        .form-group label { font-weight: bold; font-size: 0.85rem; display: block; margin-bottom: 5px; color: #444; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 0.9rem;
+        }
+        .form-group textarea { resize: vertical; }
+
+        .btn { padding: 10px 20px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: bold; }
+        .btn-save { background: #26a69a; transition: 0.3s; } .btn-save:hover { background: #00897b; }
+        .btn-reset { background: #78909c; }
+        
+        /* Edit Mode Style */
+        .btn-save.update-mode { background: var(--edit-color); color: #000; }
+
+        /* TABLE */
+        .table-responsive { overflow-x: auto; margin-top: 20px; border: 1px solid #ddd; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 1200px; }
+        th { background: #333; color: white; padding: 10px; text-align: left; }
+        td { border-bottom: 1px solid #eee; padding: 8px; vertical-align: top; background: white;}
+        tr:hover td { background: #f1f1f1; }
+        
+        .meta-text { font-size: 0.8em; color: #666; display: block; margin-top: 2px; }
+
+        /* Action Buttons in Table */
+        .action-btn { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; color: white; margin-right: 2px; font-size: 0.8rem; }
+        .btn-edit { background-color: var(--edit-color); color: black; }
+        .btn-del { background-color: var(--delete-color); }
+
+        /* SETTINGS LIST */
+        .settings-list { list-style: none; padding: 0; border: 1px solid #ddd; height: 150px; overflow-y: auto; margin-bottom: 10px; }
+        .settings-list li { padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+        .settings-list li:nth-child(even) { background: #f9f9f9; }
+
+        @media (max-width: 900px) {
+            .dashboard-grid { grid-template-columns: 1fr; grid-template-rows: auto; display: flex; flex-direction: column; }
+            .chart-card { height: 300px; } .eng-chart { height: 400px; }
+            .form-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <h2>MAINTENANCE REPORT</h2>
+        <div class="nav-links">
+            <button class="active" onclick="switchPage('dashboard')">Dashboard</button>
+            <button onclick="switchPage('input')">Input Data</button>
+            <button onclick="switchPage('settings')">Pengaturan</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        
+        <!-- === DASHBOARD === -->
+        <div id="dashboard" class="page-section active">
+            <div class="dashboard-grid">
+                <!-- 1. Report By UNIT -->
+                <div class="chart-card area-chart">
+                    <div class="canvas-container"><canvas id="chartUnit"></canvas></div>
+                </div>
+                <!-- 2. Report By KATEGORI -->
+                <div class="chart-card cat-chart">
+                    <div class="canvas-container"><canvas id="chartKategori"></canvas></div>
+                </div>
+                <!-- 3. Report By NAMA ALAT -->
+                <div class="chart-card eng-chart">
+                    <div class="canvas-container"><canvas id="chartAlat"></canvas></div>
+                </div>
+                <!-- 4. Report By MONTH -->
+                <div class="chart-card month-chart">
+                    <div class="canvas-container"><canvas id="chartMonth"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- === INPUT DATA === -->
+        <div id="input" class="page-section">
+            <div class="form-box">
+                <h3 style="margin-top:0; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+                    Form Input Maintenance 
+                    <span id="formStatus" style="float:right; font-size:0.8em; color:#78909c; font-weight:normal">Mode: Baru</span>
+                </h3>
+                
+                <div class="form-grid">
+                    <!-- KOLOM KIRI -->
+                    <div>
+                        <div class="form-group">
+                            <label>Nama Alat</label>
+                            <input type="text" id="itemName" placeholder="Contoh: Genset A">
+                        </div>
+                        <div class="form-grid" style="gap: 10px; margin-bottom: 0;">
+                            <div class="form-group">
+                                <label>Merk (Optional)</label>
+                                <input type="text" id="brandInput" placeholder="Ex: Yamaha">
+                            </div>
+                            <div class="form-group">
+                                <label>Nomor Seri</label>
+                                <input type="text" id="snInput" placeholder="Ex: SN-12345">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Unit (Lokasi)</label>
+                            <select id="unitInput"></select> 
+                        </div>
+                        <div class="form-group">
+                            <label>Kategori</label>
+                            <select id="catInput"></select> 
+                        </div>
+                        <div class="form-group">
+                            <label>Tanggal Lapor/Kejadian</label>
+                            <input type="date" id="dateInput">
+                        </div>
+                        <div class="form-group">
+                            <label>Deskripsi Masalah</label>
+                            <textarea id="probInput" rows="2" placeholder="Jelaskan kendala..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- KOLOM KANAN -->
+                    <div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="statusInput">
+                                <option>Pending</option>
+                                <option>On Progress</option>
+                                <option>Done</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Teknisi</label>
+                            <input type="text" id="techInput">
+                        </div>
+                        <div class="form-group">
+                            <label>Tanggal Perbaikan</label>
+                            <input type="date" id="repairDateInput">
+                        </div>
+                        <div class="form-group">
+                            <label>Tindakan Perbaikan</label>
+                            <textarea id="actInput" rows="2" placeholder="Apa yang dilakukan..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Sparepart yang Diganti</label>
+                            <input type="text" id="partInput" placeholder="Jika ada...">
+                        </div>
+                        <div class="form-group">
+                            <label style="color:#e65100;">Rekomendasi</label>
+                            <textarea id="recommendInput" rows="2" placeholder="Saran..."></textarea>
+                        </div>
+                        
+                        <div style="text-align: right; margin-top: 20px;">
+                            <button class="btn btn-reset" onclick="resetForm()">Batal / Reset</button>
+                            <button id="btnSave" class="btn btn-save" onclick="saveData()">Simpan Data</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TABEL DATA -->
+                <div class="table-responsive">
+                    <table id="dataTable">
+                        <thead>
+                            <tr>
+                                <th>Tgl Lapor</th>
+                                <th>Unit</th>
+                                <th>Nama Alat / Info</th>
+                                <th>Masalah</th>
+                                <th>Tindakan & Part</th>
+                                <th>Status</th>
+                                <th width="100px">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- === SETTINGS === -->
+        <div id="settings" class="page-section">
+            <div class="form-box">
+                <h3>Pengaturan Data Master</h3>
+                <div class="form-grid">
+                    <div>
+                        <h4>Daftar Unit</h4>
+                        <ul id="listUnit" class="settings-list"></ul>
+                        <div style="display:flex; gap:5px;">
+                            <input type="text" id="newUnit" placeholder="Tambah Unit..." style="flex:1">
+                            <button class="btn" style="background:#333; padding:5px 15px;" onclick="addOpt('unit')">+</button>
+                        </div>
+                    </div>
+                    <div>
+                        <h4>Daftar Kategori</h4>
+                        <ul id="listCat" class="settings-list"></ul>
+                        <div style="display:flex; gap:5px;">
+                            <input type="text" id="newCat" placeholder="Tambah Kategori..." style="flex:1">
+                            <button class="btn" style="background:#333; padding:5px 15px;" onclick="addOpt('cat')">+</button>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top:30px; border-top:1px solid #eee; padding-top:10px;">
+                    <button class="btn" style="background:#c62828" onclick="clearData()">⚠️ Hapus Semua Data</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- CONFIG ---
+        const DB_KEY = 'maint_v14_db';
+        const SET_KEY = 'maint_v14_set';
+        let charts = {};
+        let editingId = null; // Variabel untuk menyimpan ID yang sedang diedit
+
+        const defaultSettings = {
+            units: ['Unit A', 'Unit B', 'Unit C', 'Warehouse', 'Office'],
+            cats: ['Inspeksi', 'Kalibrasi', 'Pembersihan', 'Penggantian', 'Perbaikan']
+        };
+
+        // Palette Warna untuk Grafik Unit
+        const colorPalette = [
+            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', 
+            '#E7E9ED', '#8e44ad', '#2c3e50', '#27ae60', '#e67e22', '#c0392b'
+        ];
+
+        // --- INIT ---
+        window.onload = function() {
+            document.getElementById('dateInput').valueAsDate = new Date();
+            initSettings();
+            loadTable();
+            updateDashboard();
+        };
+
+        function switchPage(id) {
+            document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-links button').forEach(el => el.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            const btns = document.querySelectorAll('.nav-links button');
+            btns.forEach(btn => { if(btn.getAttribute('onclick').includes(id)) btn.classList.add('active'); });
+
+            if(id === 'dashboard') updateDashboard();
+        }
+
+        // --- DATA HANDLING ---
+        function getData() { return JSON.parse(localStorage.getItem(DB_KEY) || '[]'); }
+        function saveDataLocal(data) { localStorage.setItem(DB_KEY, JSON.stringify(data)); }
+        function getSettings() { return JSON.parse(localStorage.getItem(SET_KEY) || JSON.stringify(defaultSettings)); }
+        function saveSettings(s) { localStorage.setItem(SET_KEY, JSON.stringify(s)); initSettings(); }
+
+        // --- DASHBOARD CHARTS ---
+        function updateDashboard() {
+            const data = getData();
+            const settings = getSettings();
+
+            // 1. Data Unit
+            const unitCounts = {};
+            settings.units.forEach(u => unitCounts[u] = 0); 
+            data.forEach(r => { if(unitCounts[r.unit] !== undefined) unitCounts[r.unit]++; });
+
+            // 2. Data Kategori
+            const catCounts = {};
+            settings.cats.forEach(c => catCounts[c] = 0);
+            data.forEach(r => { if(catCounts[r.cat] !== undefined) catCounts[r.cat]++; });
+
+            // 3. Data Alat (Top 8)
+            const alatCounts = {};
+            data.forEach(r => { alatCounts[r.item] = (alatCounts[r.item] || 0) + 1; });
+            const sortedAlat = Object.entries(alatCounts).sort((a,b) => b[1]-a[1]).slice(0, 8);
+
+            // 4. Data Month
+            const monthCounts = Array(12).fill(0);
+            const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            data.forEach(r => {
+                const d = new Date(r.date);
+                if(!isNaN(d)) monthCounts[d.getMonth()]++;
+            });
+
+            // --- RENDER ---
+            const titleFont = { size: 14, weight: 'bold', family: 'Arial' };
+            const titleColor = '#444';
+
+            // Chart 1: UNIT (Warna-warni sekarang)
+            // Generate array warna sebanyak jumlah unit
+            const unitColors = Object.keys(unitCounts).map((_, i) => colorPalette[i % colorPalette.length]);
+
+            renderChart('chartUnit', 'bar', {
+                labels: Object.keys(unitCounts),
+                datasets: [{ 
+                    data: Object.values(unitCounts), 
+                    backgroundColor: unitColors, // Menggunakan array warna
+                    barPercentage: 0.5 
+                }]
+            }, {
+                plugins: { legend: { display: false }, title: { display: true, text: 'REPORT MAINTENANCE BY UNIT', font: titleFont, color: titleColor, padding: 20 } },
+                scales: { y: { display: false }, x: { grid: { display: false } } }
+            });
+
+            // Chart 2: KATEGORI
+            renderChart('chartKategori', 'doughnut', {
+                labels: Object.keys(catCounts),
+                datasets: [{ data: Object.values(catCounts), backgroundColor: colorPalette, borderWidth: 0 }]
+            }, {
+                plugins: {
+                    title: { display: true, text: 'REPORT MAINTENANCE BY KATEGORI', font: titleFont, color: titleColor, padding: 20 },
+                    legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true } }
+                }, cutout: '60%'
+            });
+
+            // Chart 3: NAMA ALAT
+            renderChart('chartAlat', 'bar', {
+                labels: sortedAlat.map(x => x[0]),
+                datasets: [{ data: sortedAlat.map(x => x[1]), backgroundColor: '#00e676', barPercentage: 0.6 }]
+            }, {
+                indexAxis: 'y',
+                plugins: { legend: { display: false }, title: { display: true, text: 'REPORT MAINTENANCE BY NAMA ALAT', font: titleFont, color: titleColor, padding: 20 } },
+                scales: { x: { display: true }, y: { grid: { display: false } } }
+            });
+
+            // Chart 4: MONTH
+            renderChart('chartMonth', 'line', {
+                labels: monthLabels,
+                datasets: [{
+                    data: monthCounts, borderColor: '#00e676', backgroundColor: 'white',
+                    pointBackgroundColor: '#fff', pointBorderColor: '#00e676', pointRadius: 5, borderWidth: 2, tension: 0
+                }]
+            }, {
+                plugins: { legend: { display: false }, title: { display: true, text: 'REPORT MAINTENANCE BY MONTH', font: titleFont, color: titleColor, padding: 20 } },
+                scales: { y: { display: false }, x: { grid: { display: false } } }
+            });
+        }
+
+        function renderChart(id, type, data, options) {
+            const ctx = document.getElementById(id).getContext('2d');
+            if (charts[id]) charts[id].destroy();
+            const finalOptions = { responsive: true, maintainAspectRatio: false, ...options };
+            charts[id] = new Chart(ctx, { type, data, options: finalOptions });
+        }
+
+        // --- FORM & CRUD LOGIC ---
+        function saveData() {
+            const item = document.getElementById('itemName').value;
+            const date = document.getElementById('dateInput').value;
+            
+            if(!item || !date) return alert("Nama Alat dan Tanggal Lapor Wajib Diisi");
+
+            // Data Objek
+            const rec = {
+                id: editingId ? editingId : Date.now(), // Gunakan ID lama jika edit, ID baru jika create
+                item: item,
+                brand: document.getElementById('brandInput').value,
+                sn: document.getElementById('snInput').value,
+                unit: document.getElementById('unitInput').value,
+                cat: document.getElementById('catInput').value,
+                date: date,
+                prob: document.getElementById('probInput').value,
+                stat: document.getElementById('statusInput').value,
+                tech: document.getElementById('techInput').value,
+                repDate: document.getElementById('repairDateInput').value,
+                act: document.getElementById('actInput').value,
+                part: document.getElementById('partInput').value,
+                recommend: document.getElementById('recommendInput').value
+            };
+
+            const data = getData();
+
+            if (editingId) {
+                // LOGIC UPDATE
+                const index = data.findIndex(r => r.id === editingId);
+                if(index !== -1) {
+                    data[index] = rec;
+                    alert("Data Berhasil Diperbarui!");
+                }
+            } else {
+                // LOGIC CREATE
+                data.push(rec);
+                alert("Data Tersimpan!");
+            }
+
+            saveDataLocal(data);
+            resetForm();
+            loadTable();
+        }
+
+        function resetForm() {
+            document.getElementById('itemName').value = '';
+            document.getElementById('brandInput').value = '';
+            document.getElementById('snInput').value = '';
+            document.getElementById('probInput').value = '';
+            document.getElementById('techInput').value = '';
+            document.getElementById('repairDateInput').value = '';
+            document.getElementById('actInput').value = '';
+            document.getElementById('partInput').value = '';
+            document.getElementById('recommendInput').value = '';
+            document.getElementById('dateInput').valueAsDate = new Date();
+            document.getElementById('statusInput').value = 'Pending';
+            
+            // Reset Edit Mode
+            editingId = null;
+            document.getElementById('btnSave').innerText = "Simpan Data";
+            document.getElementById('btnSave').classList.remove('update-mode');
+            document.getElementById('formStatus').innerText = "Mode: Baru";
+        }
+
+        function loadTable() {
+            const data = getData().sort((a,b) => new Date(b.date) - new Date(a.date));
+            const tb = document.getElementById('tableBody');
+            tb.innerHTML = '';
+            data.forEach(r => {
+                const brandSN = (r.brand || r.sn) ? `<span class="meta-text">${r.brand || '-'} / ${r.sn || '-'}</span>` : '';
+                
+                tb.innerHTML += `
+                    <tr>
+                        <td>${r.date}</td>
+                        <td>${r.unit}</td>
+                        <td>
+                            <b>${r.item}</b>
+                            ${brandSN}
+                        </td>
+                        <td><small>${r.prob}</small></td>
+                        <td>
+                            <small><b>Act:</b> ${r.act}</small><br>
+                            <small><b>Part:</b> ${r.part}</small>
+                        </td>
+                        <td><span style="padding:2px 6px; border-radius:4px; color:white; background:${r.stat==='Done'?'#26a69a':(r.stat==='Pending'?'#ef5350':'#ffa726')}">${r.stat}</span></td>
+                        <td>
+                            <button class="action-btn btn-edit" onclick="editData(${r.id})">✏️</button>
+                            <button class="action-btn btn-del" onclick="delData(${r.id})">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function editData(id) {
+            const data = getData();
+            const rec = data.find(r => r.id === id);
+            
+            if (rec) {
+                // Populate Form
+                document.getElementById('itemName').value = rec.item;
+                document.getElementById('brandInput').value = rec.brand || '';
+                document.getElementById('snInput').value = rec.sn || '';
+                document.getElementById('unitInput').value = rec.unit;
+                document.getElementById('catInput').value = rec.cat;
+                document.getElementById('dateInput').value = rec.date;
+                document.getElementById('probInput').value = rec.prob;
+                document.getElementById('statusInput').value = rec.stat;
+                document.getElementById('techInput').value = rec.tech;
+                document.getElementById('repairDateInput').value = rec.repDate;
+                document.getElementById('actInput').value = rec.act;
+                document.getElementById('partInput').value = rec.part;
+                document.getElementById('recommendInput').value = rec.recommend || '';
+
+                // Set UI to Edit Mode
+                editingId = id;
+                const btnSave = document.getElementById('btnSave');
+                btnSave.innerText = "Update Data";
+                btnSave.classList.add('update-mode');
+                document.getElementById('formStatus').innerText = "Mode: Edit (ID: " + id + ")";
+                
+                // Scroll to top
+                document.querySelector('.form-box').scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        function delData(id) {
+            if(confirm("Yakin ingin menghapus data ini?")) {
+                const data = getData().filter(r => r.id !== id);
+                saveDataLocal(data);
+                
+                // Jika data yang sedang diedit dihapus, reset form
+                if (editingId === id) {
+                    resetForm();
+                }
+                
+                loadTable();
+            }
+        }
+
+        // --- SETTINGS ---
+        function initSettings() {
+            const s = getSettings();
+            fillSelect('unitInput', s.units); 
+            fillSelect('catInput', s.cats);   
+            fillList('listUnit', s.units, 'unit'); 
+            fillList('listCat', s.cats, 'cat');    
+        }
+
+        function fillSelect(id, arr) {
+            const el = document.getElementById(id); 
+            const currentVal = el.value; // Simpan nilai saat ini agar tidak reset saat settings berubah
+            el.innerHTML = '';
+            arr.forEach(x => el.innerHTML += `<option>${x}</option>`);
+            if (currentVal && arr.includes(currentVal)) el.value = currentVal;
+        }
+
+        function fillList(id, arr, type) {
+            const el = document.getElementById(id); el.innerHTML = '';
+            arr.forEach((x, i) => {
+                el.innerHTML += `<li><span>${x}</span> <button onclick="remOpt('${type}', ${i})" style="color:red;border:none;cursor:pointer;">x</button></li>`;
+            });
+        }
+
+        function addOpt(type) {
+            const s = getSettings();
+            const val = document.getElementById(type === 'unit' ? 'newUnit' : 'newCat').value;
+            if(!val) return;
+            if(type === 'unit') s.units.push(val); else s.cats.push(val);
+            saveSettings(s);
+            document.getElementById(type === 'unit' ? 'newUnit' : 'newCat').value = '';
+        }
+
+        function remOpt(type, idx) {
+            if(!confirm("Hapus item ini?")) return;
+            const s = getSettings();
+            if(type === 'unit') s.units.splice(idx, 1); else s.cats.splice(idx, 1);
+            saveSettings(s);
+        }
+
+        function clearData() {
+            if(confirm("PERINGATAN: Hapus SEMUA data maintenance?")) { localStorage.removeItem(DB_KEY); location.reload(); }
+        }
+
+    </script>
+</body>
+</html>

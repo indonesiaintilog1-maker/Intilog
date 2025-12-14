@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>General Applications</title>
+    <style>
+        /* RESET & LAYOUT */
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { display: flex; height: 100vh; overflow: hidden; background-color: #f4f6f9; }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 260px;
+            background-color: #ffffff;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0; 
+        }
+
+        .sidebar-header {
+            background-color: #4a919e; 
+            color: white;
+            padding: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .menu-container {
+            flex: 1;
+            overflow-y: auto;
+            padding-top: 10px;
+        }
+
+        /* LABEL GROUP */
+        .menu-label {
+            padding: 15px 20px 5px 20px;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #999;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        /* MENU ITEM */
+        .menu-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #444;
+            font-size: 14px;
+            border-left: 4px solid transparent;
+            transition: 0.2s;
+            margin-bottom: 2px;
+        }
+
+        .menu-item:hover { background-color: #f0f0f0; }
+        
+        .menu-item span.label-icon { 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+            font-weight: 500;
+        }
+        
+        .arrow { font-size: 14px; color: #ccc; }
+        
+        /* WARNA SAAT AKTIF */
+        .menu-item.active {
+            background-color: #eef5f6;
+            color: #2c3e50;
+            border-left-color: #4a919e;
+            font-weight: 700;
+        }
+
+        /* CONTENT AREA */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        #layar-aplikasi { width: 100%; height: 100%; border: none; background: white; }
+        .top-bar {
+            height: 50px; background: white; border-bottom: 1px solid #ddd;
+            display: flex; align-items: center; padding: 0 20px;
+            font-size: 14px; color: #333;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR KIRI -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <span>🔹</span> General Apps
+        </div>
+
+        <div class="menu-container">
+            
+            <!-- DASHBOARD (UTAMA) -->
+            <div class="menu-label">Main</div>
+            <div class="menu-item active" onclick="bukaApp('dashboard', this)">
+                <span class="label-icon">
+                    <span>⏱️</span> Dashboard
+                </span>
+            </div>
+
+            <!-- APLIKASI LAIN -->
+            <div class="menu-label">Applications</div>
+
+            <div class="menu-item" onclick="bukaApp('dosis', this)">
+                <span class="label-icon"><span>☢️</span> Kartu Dosis</span>
+                <span class="arrow">›</span>
+            </div>
+
+            <div class="menu-item" onclick="bukaApp('stock', this)">
+                <span class="label-icon"><span>⇅</span> Stock In-Out</span>
+                <span class="arrow">›</span>
+            </div>
+
+            <div class="menu-item" onclick="bukaApp('inventory', this)">
+                <span class="label-icon"><span>🏭</span> Inventory</span>
+                <span class="arrow">›</span>
+            </div>
+
+            <div class="menu-item" onclick="bukaApp('maintenance', this)">
+                <span class="label-icon"><span>📖</span> Maintenance Rec</span>
+                <span class="arrow">›</span>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- AREA KONTEN KANAN -->
+    <div class="main-content">
+        <div class="top-bar" id="judul-halaman"> Welcome </div>
+        
+        <!-- IFRAME KOSONG (Nanti diisi script) -->
+        <iframe 
+		id="layar-aplikasi"></iframe>
+    </div>
+
+    <script>
+        // --- 1. KODE HTML UNTUK TAMPILAN WELCOME ---
+        // Kita simpan desain Welcome di sini agar tidak perlu buat file baru
+        const welcomePageHTML = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body { 
+                        display: flex; 
+                        justify-content: center; 
+                        align-items: center; 
+                        height: 100vh; 
+                        margin: 0; 
+                        background-color: #fff; 
+                        font-family: 'Segoe UI', sans-serif; 
+                        flex-direction: column;
+                    }
+                    h1 { font-size: 3rem; color: #ccc; margin: 0; font-weight: 300; }
+                    h2 { font-size: 5rem; color: #4a919e; margin: 0; letter-spacing: 2px; }
+                    p { color: #888; margin-top: 20px; }
+                </style>
+            </head>
+            <body>
+                <h1>Welcome to</h1>
+                <h2>INTILOG</h2>
+                <p>Select application from the sidebar to start.</p>
+            </body>
+            </html>
+        `;
+
+        // --- 2. JALANKAN SAAT PERTAMA KALI DIBUKA ---
+        window.onload = function() {
+            var layar = document.getElementById('layar-aplikasi');
+            layar.srcdoc = welcomePageHTML; // Tampilkan welcome
+        };
+
+        // --- 3. FUNGSI GANTI APLIKASI ---
+        function bukaApp(jenis, elemen) {
+            var layar = document.getElementById('layar-aplikasi');
+            var judul = document.getElementById('judul-halaman');
+            
+            if (jenis === 'dashboard') {
+                layar.removeAttribute('src'); // Hapus link file luar
+                layar.srcdoc = welcomePageHTML; // Masukkan HTML Welcome
+                judul.innerText = "Welcome";
+            }
+            else {
+                // Untuk aplikasi lain, hapus srcdoc (welcome) dan pakai src (file folder)
+                layar.removeAttribute('srcdoc'); 
+                
+                if (jenis === 'dosis') {
+                    layar.src = "Apps_Kartu_Dosis/index.html"; 
+                    judul.innerText = "Kartu Dosis";
+                } 
+                else if (jenis === 'stock') {
+                    layar.src = "Apps_Stock_In-Out/index.html";
+                    judul.innerText = "Stock In-Out";
+                }
+                else if (jenis === 'inventory') {
+                    layar.src = "Inventory/index.html"; 
+                    judul.innerText = "Inventory Management";
+                }
+                else if (jenis === 'maintenance') {
+                    layar.src = "Maintenance_Record/index.html"; 
+                    judul.innerText = "Maintenance Record";
+                }
+            }
+
+            // Ganti warna tombol aktif
+            var semuaItem = document.querySelectorAll('.menu-item');
+            semuaItem.forEach(item => item.classList.remove('active'));
+            elemen.classList.add('active');
+        }
+    </script>
+
+</body>
+</html>
